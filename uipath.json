@@ -1,0 +1,105 @@
+{
+    "entryPoints": [
+        {
+            "filePath": "agent",
+            "uniqueId": "177d6778-f7c0-443b-b585-684e6b800129",
+            "type": "agent",
+            "input": {
+                "type": "object",
+                "properties": {
+                    "message_id": {
+                        "type": "string"
+                    },
+                    "email_language": {
+                        "type": "string"
+                    },
+                    "email_body": {
+                        "type": "string"
+                    },
+                    "email_subject": {
+                        "type": "string"
+                    },
+                    "translated_email": {
+                        "type": "string"
+                    },
+                    "order_id": {
+                        "type": "string"
+                    },
+                    "isorder_valid": {
+                        "type": "boolean"
+                    },
+                    "email_category": {
+                        "type": "string"
+                    },
+                    "email_response": {
+                        "type": "string"
+                    },
+                    "final_status": {
+                        "type": "string"
+                    },
+                    "hitl_required": {
+                        "default": false,
+                        "title": "Hitl Required",
+                        "type": "boolean"
+                    },
+                    "validation_complete": {
+                        "default": false,
+                        "title": "Validation Complete",
+                        "type": "boolean"
+                    }
+                },
+                "required": []
+            },
+            "output": {
+                "type": "object",
+                "properties": {
+                    "message_id": {
+                        "type": "string"
+                    },
+                    "email_language": {
+                        "type": "string"
+                    },
+                    "email_body": {
+                        "type": "string"
+                    },
+                    "email_subject": {
+                        "type": "string"
+                    },
+                    "translated_email": {
+                        "type": "string"
+                    },
+                    "order_id": {
+                        "type": "string"
+                    },
+                    "isorder_valid": {
+                        "type": "boolean"
+                    },
+                    "email_category": {
+                        "type": "string"
+                    },
+                    "email_response": {
+                        "type": "string"
+                    },
+                    "final_status": {
+                        "type": "string"
+                    },
+                    "hitl_required": {
+                        "default": null,
+                        "title": "Hitl Required",
+                        "type": "boolean"
+                    },
+                    "validation_complete": {
+                        "default": null,
+                        "title": "Validation Complete",
+                        "type": "boolean"
+                    }
+                },
+                "required": []
+            }
+        }
+    ],
+    "bindings": {
+        "version": "2.0",
+        "resources": []
+    }
+}

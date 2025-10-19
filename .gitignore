@@ -1,0 +1,4 @@
+.env
+.uipath/.auth.json
+.uipath/.error_log
+.uipath/.telemetry.json
