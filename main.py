@@ -72,9 +72,11 @@ class GraphState(BaseModel):
     mail_communication_language: str | None = None
     order_id: str | None = None
     order_details: Dict[str, Any] | None = None
+    email_sentiment: Dict[str, Any] | None = None
     isorder_valid: bool | None = None
     email_category: str | None = None
     email_response: str | None = None
+    hitl_response: str | None = None
     final_status: str | None = None  # "actioned", "ignored"
 
     # Control flags
@@ -167,6 +169,62 @@ async def get_order_details_mcp(order_id: str):
             logging.error(f"Error Fetching order details via MCP: {e}")
             raise
 
+##Get Email Categorization via MCP
+async def categorize_email_mcp(content_to_categorize: str):
+    """Categorize email body and subject with MCP tool"""
+    async with get_mcp_session() as session:
+        tools = await load_mcp_tools(session)
+        #print(tools)
+        
+        # Get Order Details tool
+        translategetemaildetails_tool = next((tool for tool in tools if "categorizeEmail".lower() in tool.name.lower()), None)
+        if not translategetemaildetails_tool:
+            logging.error("categorizeEmail tool not found in MCP server")
+            raise Exception("Categorize Email tool not available")
+        
+        print("Invoking Categorize Email tool...")
+        print(content_to_categorize+"-----------------")
+        try:
+            result = await translategetemaildetails_tool.ainvoke({
+                "in_Content_To_Categorize": content_to_categorize
+            })
+            print("categorizeEmail mcp tool result: "+"-----------------"+result)
+            logging.info(f"Categorized email via MCP tool.")        
+            # Assuming 'result' is your string variable
+            order_details_dict = ast.literal_eval(result) if result else None  
+            return order_details_dict if order_details_dict else None   
+            
+        except Exception as e:
+            logging.error(f"Error Categorizing email via MCP: {e}")
+            raise
+
+##Email Sentiment Analysis via MCP
+async def analyze_email_sentiment_mcp(content_to_sentiment_analysis: str):
+    """Email Sentiment Analysis email body and subject with MCP tool"""
+    async with get_mcp_session() as session:
+        tools = await load_mcp_tools(session)
+        
+        # Email Sentiment Analysis tool
+        emailsentimentanalysis_tool = next((tool for tool in tools if "emailSentimentAnalysis".lower() in tool.name.lower()), None)
+        if not emailsentimentanalysis_tool:
+            logging.error("emailSentimentAnalysis tool not found in MCP server")
+            raise Exception("Email Sentiment Analysis tool not available")
+        
+        print("Invoking Email Sentiment Analysis tool...")
+        print(content_to_sentiment_analysis+"-----------------")
+        try:
+            result = await emailsentimentanalysis_tool.ainvoke({
+                "in_Content_To_Analysis": content_to_sentiment_analysis
+            })
+            print("emailSentimentAnalysis mcp tool result: "+"-----------------"+result)
+            logging.info(f"Email Sentiment Analysis via MCP tool.")        
+            # Assuming 'result' is your string variable
+            sentiment_analysis_dict = ast.literal_eval(result) if result else None  
+            return sentiment_analysis_dict if sentiment_analysis_dict else None   
+            
+        except Exception as e:
+            logging.error(f"Error Email Sentiment Analysis via MCP: {e}")
+            raise
 
 # ---------------- Graph Nodes ----------------
 class GraphOutput(BaseModel):
@@ -206,7 +264,7 @@ async def extract_order_id_node(state: GraphState) -> GraphState:
     """Extract order id information from the request"""
     system_prompt = """You are a data extraction expert tasked with extracting order id information from input text. 
 
-    Your goal is to extract the following three fields:
+    Your goal is to extract the following fields:
     1. order id - the order id will be 8 digit number
 
     Instructions:
@@ -252,7 +310,7 @@ async def extract_order_id_node(state: GraphState) -> GraphState:
 
     output = await llm.ainvoke(
         [SystemMessage(system_prompt),
-         HumanMessage(state.email_body)]
+         HumanMessage(state.email_body + "\n" + state.email_subject)]
     )
     try:
         payload = json.loads(output.content)
@@ -285,11 +343,6 @@ async def get_order_details_node(state: GraphState) -> GraphOutput:
     return state.model_copy(update={
         "order_details": order_details_obj["out_OrderDetails"] or None
     })
-
-async def check_fields_node(state: GraphState) -> GraphState:
-    """Check if all required fields are present"""
-    hitl_required = not state.leave_start or not state.leave_end or not state.leave_reason
-    return state.model_copy(update={"hitl_required": hitl_required})
 
 def end_node(state: GraphState) -> GraphState:
     """Final node to log the completion"""
@@ -335,77 +388,72 @@ async def reply_email_mcp(message_id: str, llmprompt_to_prepare_reply: str, repl
 # ---------------- Nodes ----------------
 # Categorize email via MCP integration
 async def categorize_email_node(state: GraphState) -> GraphOutput:
-    """Categorize email body and subject"""
-    system_prompt = """You are a after sales product and service support expert tasked with extracting order id information from input text. 
-
-    Your goal is to extract the following three fields:
-    1. order id - the order id will be 8 digit number
-
-    Instructions:
-    - Only return a JSON object with keys: order_id
-    - If a field cannot be determined, return null.
-    - If multiple order ids are present, extract the first one only.
-    - Only output the JSON. Do not include any explanations, commentary, or extra text.
-
-    Examples:
-
-    User message: "My order number is 12345678 and I need help."
-    Output:
-    {
-    "order_id": "12345678"
-    }
-    User message: "My order number is #12345678 and I need help."
-    Output:
-    {
-    "order_id": "12345678"
-    }
-    User message: "My order no is #12345678 and I need help."
-    Output:
-    {
-    "order_id": "12345678"
-    }
-    User message: "My order #12345678 and I need help."
-    Output:
-    {
-    "order_id": "12345678"
-    }
-    User message: "I have purchased a fan with order id 87654321 last week."
-    Output:
-    {
-    "order_id": "87654321",
-    }
-
-    User message: "My TV isn't working properly."
-    Output:
-    {
-    "order_id": null
-    }
-    """
-
-    output = await llm.ainvoke(
-        [SystemMessage(system_prompt),
-         HumanMessage(state.email_body)]
+    """Categorize email by body and subject"""
+    categorize_email_obj = await categorize_email_mcp(
+        state.translated_email_body + "\n" + state.translated_email_subject
     )
-    try:
-        payload = json.loads(output.content)
-    except Exception:
-        payload = None
-
-    raw = (output.content or "").lower()
-    null_patterns = ['"order_id": null', "'order_id' is null", "order_id is null", "order_id: null"]
-
-    if any(p in raw for p in null_patterns):
-        
-        extracted_order_id = None
-    else:
-        extracted_order_id = None
-        if isinstance(payload, dict):
-            extracted_order_id = payload.get("order_id")
-
+    
     return state.model_copy(update={
-        "order_id": extracted_order_id or None
+        "email_category": categorize_email_obj["out_Category"] or None
     })
 
+# ---------------- Nodes ----------------
+# Analyze email sentiment via MCP integration
+async def analyze_email_sentiment_node(state: GraphState) -> GraphOutput:
+    """Analyze email sentiment by body and subject"""
+    email_sentiment_obj = await analyze_email_sentiment_mcp(
+        state.translated_email_body + "\n" + state.translated_email_subject
+    )
+    
+    # Normalize email sentiment to a dict (MCP may return a stringified dict)
+    sentiment_raw = None
+    if isinstance(email_sentiment_obj, dict):
+        sentiment_raw = email_sentiment_obj.get("out_Email_Sentiment")
+    else:
+        sentiment_raw = email_sentiment_obj
+
+    sentiment_dict = None
+    if isinstance(sentiment_raw, dict):
+        sentiment_dict = sentiment_raw
+    elif isinstance(sentiment_raw, str):
+        try:
+            sentiment_dict = json.loads(sentiment_raw)
+        except Exception:
+            try:
+                sentiment_dict = ast.literal_eval(sentiment_raw)
+            except Exception:
+                sentiment_dict = {"raw": sentiment_raw}
+    else:
+        sentiment_dict = None
+
+    return state.model_copy(update={
+        "email_sentiment": sentiment_dict or None
+    })
+
+# ---------------- Nodes ----------------
+# Human-in-the-loop review in case of negative sentiment node
+async def human_review_node(state: GraphState) -> Command:
+    """Send to human review"""
+    
+    action_data = interrupt(
+        CreateAction(
+            app_name="HITL_Review",
+            title="Negative sentiment email response review",
+            data={
+                "EmailSubject": state.translated_email_subject,
+                "EmailBody": state.translated_email_body,
+                "InitialResponse": "This is sample generated response"
+            },
+            app_version=1,
+            app_folder_path="Shared/ReviewEmailResponseSolution"
+        )
+    )
+
+    email_response = action_data.get("InitialResponse")
+    
+    return Command(update={
+        "hitl_response": email_response
+    })
 
 # ---------------- Condition Functions ----------------
 def should_go_to_order_id_auto_reject(state: GraphState):
@@ -421,6 +469,8 @@ graph.add_node("extract_order_id", extract_order_id_node)
 graph.add_node("get_order_details", get_order_details_node)
 graph.add_node("auto_reject", auto_reject_node)
 graph.add_node("categorize_email", categorize_email_node)
+graph.add_node("analyze_email_sentiment", analyze_email_sentiment_node)
+graph.add_node("human_review", human_review_node)
 graph.add_node("step_end", end_node)
 
 # Set entry point
@@ -438,7 +488,9 @@ graph.add_conditional_edges(
  )
 graph.add_edge("auto_reject", "step_end")
 graph.add_edge("get_order_details", "categorize_email")
-graph.add_edge("categorize_email", "step_end")
+graph.add_edge("categorize_email", "analyze_email_sentiment")
+graph.add_edge("analyze_email_sentiment", "human_review")
+graph.add_edge("human_review", "step_end")
 graph.add_edge("step_end", END)
 
 # Compile the graph
