@@ -1,3 +1,4 @@
+import asyncio
 from pydantic import BaseModel
 from langgraph.graph import StateGraph, END
 from langgraph.types import interrupt, Command
@@ -397,6 +398,97 @@ async def categorize_email_node(state: GraphState) -> GraphOutput:
         "email_category": categorize_email_obj["out_Category"] or None
     })
 
+# ---------------- Helper Functions ----------------
+async def get_answer_with_context(state: GraphState) -> str:
+    """Get answer to user query with context grounding and LLM analysis"""
+    
+    # Default return value
+    email_response = None
+    
+    try:
+        # Your existing policy check logic...
+        context_query = f"""Get details for the product {state.order_details.get("ProductName", "")}. Provide detailed information about the product features, specifications, warranty policy, and any other relevant details that can help in addressing customer inquiries or issues related to this product. If required, also include information about common troubleshooting steps or usage guidelines for this product and customer care contact details."""
+        
+        print("Context Query: ", context_query)
+        # Try to get products context
+        try:
+            products_context = context_grounding.invoke(context_query)
+            logging.info(f"DEBUG: Retrieved {len(products_context) if products_context else 0} documents")
+        except Exception as e:
+            logging.warning(f"WARNING: Context grounding failed: {e}")
+            return email_response
+        
+        if products_context:
+            # Process documents...
+            llm_context = []
+            for doc in products_context:
+                product_specification = doc.page_content
+                source = doc.metadata.get('source', 'Unknown')
+                page = doc.metadata.get('page_number', '1')
+                product_specification_docs = f"Source: {source} (Page {page})\n{product_specification}"
+                llm_context.append(product_specification_docs)
+            
+            # # LLM analysis...
+            try:
+                system_prompt = f"""
+                You are an AI product assistant designed to help customers with their product-related queries. Your primary responsibilities are:
+                1. Understand and interpret customer queries about products.
+                2. Use the provided context grounding index to find relevant information about the products.
+                3. Formulate clear, concise, and accurate responses to customer queries based on the information from the context index.
+                4. If the exact information is not available, provide the most relevant information you can find and be transparent about any limitations.
+                5. Always maintain a professional, helpful, and friendly tone in your responses.
+                6. If you cannot find an answer to a query, politely inform the customer and suggest alternative ways they might get the information they need.
+                
+                Use this context to answer the customer query:
+                {llm_context}
+
+                Remember, your goal is to provide the best possible assistance to customers regarding their product inquiries.
+                
+                Return the output in plain string. No JSON format is required.
+                """
+                user_prompt = f"""
+                Please process the following customer query about our product:
+                Query: {state.translated_email_subject} + "\n" +{state.translated_email_body}
+                
+                To answer this query:
+                1. Analyze the query to understand what information the customer is seeking.
+                2. Search the context grounding index for relevant product information.
+                3. Formulate a clear and concise answer based on the information found.
+                4. If additional product details are available and relevant, include them in your response.
+                5. Ensure your response is helpful and directly addresses the customer's query.
+                
+                Provide your response in the following format:
+                - Your response to the customer's query
+
+                """
+
+                response = await llm.ainvoke([
+                    SystemMessage(system_prompt),
+                    HumanMessage(user_prompt)
+                ])
+                
+                result = response.content
+                return result
+                
+            except Exception as e:
+                logging.warning(f"WARNING: LLM get_answer_with_context failed: {e}")
+                return email_response or None
+        else:
+            logging.warning("WARNING: No context found")
+            return email_response or None
+            
+    except Exception as e:
+        logging.error(f"ERROR: get_answer_with_context completely failed: {e}")
+        return email_response or None
+    
+async def get_answer_to_query_node(state: GraphState) -> GraphState:
+    """Get answer to user query with context grounding and LLM analysis"""
+    answer_of_query = await get_answer_with_context(state)
+    
+    return state.model_copy(update={
+        "email_response": answer_of_query or None
+    })
+
 # ---------------- Nodes ----------------
 # Analyze email sentiment via MCP integration
 async def analyze_email_sentiment_node(state: GraphState) -> GraphOutput:
@@ -470,6 +562,7 @@ graph.add_node("get_order_details", get_order_details_node)
 graph.add_node("auto_reject", auto_reject_node)
 graph.add_node("categorize_email", categorize_email_node)
 graph.add_node("analyze_email_sentiment", analyze_email_sentiment_node)
+graph.add_node("get_answer_to_query", get_answer_to_query_node)
 graph.add_node("human_review", human_review_node)
 graph.add_node("step_end", end_node)
 
@@ -489,8 +582,8 @@ graph.add_conditional_edges(
 graph.add_edge("auto_reject", "step_end")
 graph.add_edge("get_order_details", "categorize_email")
 graph.add_edge("categorize_email", "analyze_email_sentiment")
-graph.add_edge("analyze_email_sentiment", "human_review")
-graph.add_edge("human_review", "step_end")
+graph.add_edge("analyze_email_sentiment", "get_answer_to_query")
+graph.add_edge("get_answer_to_query", "step_end")
 graph.add_edge("step_end", END)
 
 # Compile the graph
