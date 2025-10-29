@@ -80,10 +80,6 @@ class GraphState(BaseModel):
     hitl_response: str | None = None
     final_status: str | None = None  # "actioned", "ignored"
 
-    # Control flags
-    hitl_required: bool = False
-    validation_complete: bool = False
-
 async def get_email_details_mcp(message_Id: str):
     """Get email details from MCP tools"""
     async with get_mcp_session() as session:
@@ -254,7 +250,7 @@ async def translate_email_language_node(state: GraphState) -> GraphOutput:
     )
     
     return state.model_copy(update={
-        "agent_language": email_details['out_CommunicationLanguage'] or None,
+        "mail_communication_language": email_details['out_CommunicationLanguage'] or None,
         "translated_email_body": email_details['out_TranslatedMailBody'] or None,
         "translated_email_subject": email_details['out_TranslatedMailSubject'] or None
     })
@@ -353,11 +349,23 @@ def end_node(state: GraphState) -> GraphState:
 # ---------------- Nodes ----------------
 # Auto-reject email via MCP integration
 async def auto_reject_node(state: GraphState) -> GraphState:
-    """Send auto-rejection email with reason of rejectstion via MCP integration"""
+    """Send auto-rejection email via MCP integration"""
     await reply_email_mcp(
         message_id=state.message_id,
         llmprompt_to_prepare_reply="We regret to inform you that your order Id is missing from your email. Please provide a valid order Id for us to assist you further.",
         reply_language=state.agent_language
+    )
+    
+    return state.model_copy(update={"final_status": "completed"})
+
+# ---------------- Nodes ----------------
+# Reply to email via MCP integration
+async def reply_to_email_node(state: GraphState) -> GraphState:
+    """Send email reply via MCP integration"""
+    await reply_email_mcp(
+        message_id=state.message_id,
+        llmprompt_to_prepare_reply = state.hitl_response if state.hitl_response else state.email_response,
+        reply_language=state.mail_communication_language
     )
     
     return state.model_copy(update={"final_status": "completed"})
@@ -534,7 +542,7 @@ async def human_review_node(state: GraphState) -> Command:
             data={
                 "EmailSubject": state.translated_email_subject,
                 "EmailBody": state.translated_email_body,
-                "InitialResponse": "This is sample generated response"
+                "InitialResponse": state.email_response
             },
             app_version=1,
             app_folder_path="Shared/ReviewEmailResponseSolution"
@@ -552,6 +560,11 @@ def should_go_to_order_id_auto_reject(state: GraphState):
     """Check if order_id is missing and autorejection is required"""
     return "order_id_missing" if state.order_id is None else "order_id_available"
 
+# ---------------- Condition Functions ----------------
+def should_go_to_HITL_review(state: GraphState):
+    """Check if email sentiment is very negative and HITL review is required"""
+    return "very_negative_sentiment" if state.email_sentiment.get("label") == "Very Negative" else "agent_can_proceed_sentiment"
+
 # ---------------- Build Graph ----------------
 graph = StateGraph(GraphState)
 
@@ -564,6 +577,7 @@ graph.add_node("categorize_email", categorize_email_node)
 graph.add_node("analyze_email_sentiment", analyze_email_sentiment_node)
 graph.add_node("get_answer_to_query", get_answer_to_query_node)
 graph.add_node("human_review", human_review_node)
+graph.add_node("reply_to_email", reply_to_email_node)
 graph.add_node("step_end", end_node)
 
 # Set entry point
@@ -583,7 +597,16 @@ graph.add_edge("auto_reject", "step_end")
 graph.add_edge("get_order_details", "categorize_email")
 graph.add_edge("categorize_email", "analyze_email_sentiment")
 graph.add_edge("analyze_email_sentiment", "get_answer_to_query")
-graph.add_edge("get_answer_to_query", "step_end")
+graph.add_conditional_edges(
+    "get_answer_to_query", 
+    should_go_to_HITL_review,
+    {
+        "very_negative_sentiment": "human_review",
+        "agent_can_proceed_sentiment": "reply_to_email"
+    }
+ )
+graph.add_edge("human_review", "reply_to_email")
+graph.add_edge("reply_to_email", "step_end")
 graph.add_edge("step_end", END)
 
 # Compile the graph
