@@ -30,7 +30,6 @@ uipath_client = UiPath()
 async def get_mcp_session():
     """MCP session management"""
     MCP_SERVER_URL = os.getenv("UIPATH_MCP_SERVER_URL")
-    print(MCP_SERVER_URL)
     if hasattr(uipath_client, 'api_client'):
                 if hasattr(uipath_client.api_client, 'default_headers'):
                     auth_header = uipath_client.api_client.default_headers.get('Authorization', '')
@@ -49,7 +48,7 @@ async def get_mcp_session():
 
 async def get_mcp_tools():
     """Load MCP tools for use with agents"""
-    print("Loading MCP tools...")
+    logging.info(f"Loading MCP tools...")
     async with get_mcp_session() as session:
         tools = await load_mcp_tools(session)
         return tools
@@ -78,7 +77,7 @@ class GraphState(BaseModel):
     email_category: str | None = None
     email_response: str | None = None
     hitl_response: str | None = None
-    final_status: str | None = None  # "actioned", "ignored"
+    final_status: str | None = None  
 
 async def get_email_details_mcp(message_Id: str):
     """Get email details from MCP tools"""
@@ -119,15 +118,13 @@ async def translate_email_language_mcp(email_subject: str, email_body: str, agen
             logging.error("Translate Email Subject And BodybLanguage tool not found in MCP server")
             raise Exception("translateEmailSubjectAndBodyLanguage tool not available")
         
-        print("Invoking translate tool...")
-        print(agent_language+"-----------------"+email_subject+"-----------------"+email_body)
+        logging.info(f"Invoking Translate Email Subject And Body Language MCP tool...")
         try:
             result = await translategetemaildetails_tool.ainvoke({
                 "in_OriginalEmailSubject": email_subject,
                 "in_OriginalEmailBody": email_body,
                 "in_Language": agent_language
             })
-            print("translateemailsubjectandbodylanguage mcp tool result: "+"-----------------"+result)
             logging.info(f"Email language translation done via MCP")        
             # Assuming 'result' is your string variable
             email_details_dict = ast.literal_eval(result) if result else None  
@@ -150,13 +147,11 @@ async def get_order_details_mcp(order_id: str):
             logging.error("getOrderDetailsByOrderId tool not found in MCP server")
             raise Exception("getOrderDetailsByOrderId tool not available")
         
-        print("Invoking get order details tool...")
-        print(order_id+"-----------------")
+        logging.info(f"Invoking getOrderDetailsByOrderId MCP tool...")
         try:
             result = await translategetemaildetails_tool.ainvoke({
                 "in_OrderNumber": order_id
             })
-            print("getOrderDetailsByOrderId mcp tool result: "+"-----------------"+result)
             logging.info(f"Fetched order details via MCP tool.")        
             # Assuming 'result' is your string variable
             order_details_dict = ast.literal_eval(result) if result else None  
@@ -171,7 +166,6 @@ async def categorize_email_mcp(content_to_categorize: str):
     """Categorize email body and subject with MCP tool"""
     async with get_mcp_session() as session:
         tools = await load_mcp_tools(session)
-        #print(tools)
         
         # Get Order Details tool
         translategetemaildetails_tool = next((tool for tool in tools if "categorizeEmail".lower() in tool.name.lower()), None)
@@ -179,13 +173,11 @@ async def categorize_email_mcp(content_to_categorize: str):
             logging.error("categorizeEmail tool not found in MCP server")
             raise Exception("Categorize Email tool not available")
         
-        print("Invoking Categorize Email tool...")
-        print(content_to_categorize+"-----------------")
+        logging.info(f"Invoking Categorize Email tool...")
         try:
             result = await translategetemaildetails_tool.ainvoke({
                 "in_Content_To_Categorize": content_to_categorize
             })
-            print("categorizeEmail mcp tool result: "+"-----------------"+result)
             logging.info(f"Categorized email via MCP tool.")        
             # Assuming 'result' is your string variable
             order_details_dict = ast.literal_eval(result) if result else None  
@@ -207,13 +199,11 @@ async def analyze_email_sentiment_mcp(content_to_sentiment_analysis: str):
             logging.error("emailSentimentAnalysis tool not found in MCP server")
             raise Exception("Email Sentiment Analysis tool not available")
         
-        print("Invoking Email Sentiment Analysis tool...")
-        print(content_to_sentiment_analysis+"-----------------")
+        logging.info(f"Invoking emailSentimentAnalysis tool...")
         try:
             result = await emailsentimentanalysis_tool.ainvoke({
                 "in_Content_To_Analysis": content_to_sentiment_analysis
             })
-            print("emailSentimentAnalysis mcp tool result: "+"-----------------"+result)
             logging.info(f"Email Sentiment Analysis via MCP tool.")        
             # Assuming 'result' is your string variable
             sentiment_analysis_dict = ast.literal_eval(result) if result else None  
@@ -324,7 +314,7 @@ async def extract_order_id_node(state: GraphState) -> GraphState:
         extracted_order_id = None
         if isinstance(payload, dict):
             extracted_order_id = payload.get("order_id")
-
+    logging.info(f"Extracted Order ID: {extracted_order_id}")
     return state.model_copy(update={
         "order_id": extracted_order_id or None
     })
@@ -350,6 +340,7 @@ def end_node(state: GraphState) -> GraphState:
 # Auto-reject email via MCP integration
 async def auto_reject_node(state: GraphState) -> GraphState:
     """Send auto-rejection email via MCP integration"""
+    logging.info(f"Auto-rejecting email due to missing order id.")
     await reply_email_mcp(
         message_id=state.message_id,
         llmprompt_to_prepare_reply="We regret to inform you that your order Id is missing from your email. Please provide a valid order Id for us to assist you further.",
@@ -362,6 +353,7 @@ async def auto_reject_node(state: GraphState) -> GraphState:
 # Reply to email via MCP integration
 async def reply_to_email_node(state: GraphState) -> GraphState:
     """Send email reply via MCP integration"""
+    logging.info(f"Replying to email via MCP integration.")
     await reply_email_mcp(
         message_id=state.message_id,
         llmprompt_to_prepare_reply = state.hitl_response if state.hitl_response else state.email_response,
@@ -388,7 +380,7 @@ async def reply_email_mcp(message_id: str, llmprompt_to_prepare_reply: str, repl
                 "in_llmprompt_to_prepare_reply": llmprompt_to_prepare_reply,
                 "in_Reply_Language": reply_language
             })
-            logging.info(f"Replied to email via MCP.")
+            logging.info(f"Replied to email via MCP tool.")
             
         except Exception as e:
             logging.error(f"Error replying to email via MCP: {e}")
@@ -412,18 +404,17 @@ async def get_answer_with_context(state: GraphState) -> str:
     
     # Default return value
     email_response = None
-    
+    logging.info(f"Generating email response with context grounding and LLM analysis...")
     try:
         # Your existing policy check logic...
         context_query = f"""Get details for the product {state.order_details.get("ProductName", "")}. Provide detailed information about the product features, specifications, warranty policy, and any other relevant details that can help in addressing customer inquiries or issues related to this product. If required, also include information about common troubleshooting steps or usage guidelines for this product and customer care contact details."""
         
-        print("Context Query: ", context_query)
         # Try to get products context
         try:
             products_context = context_grounding.invoke(context_query)
-            logging.info(f"DEBUG: Retrieved {len(products_context) if products_context else 0} documents")
+            logging.debug(f"Retrieved {len(products_context) if products_context else 0} documents")
         except Exception as e:
-            logging.warning(f"WARNING: Context grounding failed: {e}")
+            logging.error(f"Context grounding failed: {e}")
             return email_response
         
         if products_context:
@@ -479,14 +470,14 @@ async def get_answer_with_context(state: GraphState) -> str:
                 return result
                 
             except Exception as e:
-                logging.warning(f"WARNING: LLM get_answer_with_context failed: {e}")
+                logging.error(f"LLM get_answer_with_context failed: {e}")
                 return email_response or None
         else:
-            logging.warning("WARNING: No context found")
+            logging.error("No context found")
             return email_response or None
             
     except Exception as e:
-        logging.error(f"ERROR: get_answer_with_context completely failed: {e}")
+        logging.error(f"Get_answer_with_context completely failed: {e}")
         return email_response or None
     
 async def get_answer_to_query_node(state: GraphState) -> GraphState:
@@ -501,11 +492,12 @@ async def get_answer_to_query_node(state: GraphState) -> GraphState:
 # Analyze email sentiment via MCP integration
 async def analyze_email_sentiment_node(state: GraphState) -> GraphOutput:
     """Analyze email sentiment by body and subject"""
+    logging.info(f"Analyzing email sentiment via MCP integration...")
     email_sentiment_obj = await analyze_email_sentiment_mcp(
         state.translated_email_body + "\n" + state.translated_email_subject
     )
-    
     # Normalize email sentiment to a dict (MCP may return a stringified dict)
+    
     sentiment_raw = None
     if isinstance(email_sentiment_obj, dict):
         sentiment_raw = email_sentiment_obj.get("out_Email_Sentiment")
@@ -534,7 +526,7 @@ async def analyze_email_sentiment_node(state: GraphState) -> GraphOutput:
 # Human-in-the-loop review in case of negative sentiment node
 async def human_review_node(state: GraphState) -> Command:
     """Send to human review"""
-    
+    logging.info(f"Sending email response to HITL review due to very negative sentiment.")
     action_data = interrupt(
         CreateAction(
             app_name="HITL_Review",
