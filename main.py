@@ -344,7 +344,7 @@ async def auto_reject_node(state: GraphState) -> GraphState:
     await reply_email_mcp(
         message_id=state.message_id,
         llmprompt_to_prepare_reply="We regret to inform you that your order Id is missing from your email. Please provide a valid order Id for us to assist you further.",
-        reply_language=state.agent_language
+        reply_language=state.mail_communication_language
     )
     
     return state.model_copy(update={"final_status": "completed"})
