@@ -3,8 +3,13 @@
 **AssistmAIgic** is a specialized automation agent designed to streamline customer email handling for product orders and inquiries. Built on LangGraph’s state machine architecture and integrated with UiPath’s Model Context Portal (MCP), it delivers fast, accurate, and context-aware responses while ensuring human oversight for sensitive cases.
 
 <img width="155" height="195" alt="MCP" src="https://github.com/user-attachments/assets/bcf6b1bb-947c-414a-8c57-e0f070cb7706" />
-<img width="155" height="500" alt="langchain-icon-seeklogo" src="https://github.com/user-attachments/assets/af91b919-125f-4f00-8300-56e51b5884c2" />
+
+
+<img width="155" height="1024" alt="langgraph-color" src="https://github.com/user-attachments/assets/875ddd39-6cdf-4a97-be29-71282bb1341d" />
+
+
 <img width="155" height="74" alt="UiPath" src="https://github.com/user-attachments/assets/582d0009-a105-4325-9292-912b17ce066a" />
+
 
 ---
 
