@@ -79,38 +79,12 @@ class GraphState(BaseModel):
     hitl_response: str | None = None
     final_status: str | None = None  
 
-async def get_email_details_mcp(message_Id: str):
-    """Get email details from MCP tools"""
-    async with get_mcp_session() as session:
-        tools = await load_mcp_tools(session)
-        #print(tools)
-        
-        # Find the getEmailByMessageId update tool
-        getemaildetails_tool = next((tool for tool in tools if "getemailbymessageid" in tool.name.lower()), None)
-        if not getemaildetails_tool:
-            logging.error("Get Email by message id tool not found in MCP server")
-            raise Exception("Get Email by message id tool not available")
-        
-        try:
-            result = await getemaildetails_tool.ainvoke({
-                "in_EmailMessageId": message_Id
-            })
-            print(result+"-----------------"+message_Id)
-            logging.info(f"Retrieved email details via MCP")        
-            # Assuming 'result' is your string variable
-            email_details_dict = ast.literal_eval(result) if result else None  
-            return email_details_dict if email_details_dict else None   
-            
-        except Exception as e:
-            logging.error(f"Error retrieving email details via MCP: {e}")
-            raise
 
-##Translate email body and subject language if required
+## Translate email body and subject language if required
 async def translate_email_language_mcp(email_subject: str, email_body: str, agent_language: str):
     """Translate email body and subject language if required by MCP tools"""
     async with get_mcp_session() as session:
         tools = await load_mcp_tools(session)
-        #print(tools)
         
         # Translate Email details tool
         translategetemaildetails_tool = next((tool for tool in tools if "translateemailsubjectandbodylanguage" in tool.name.lower()), None)
@@ -134,22 +108,21 @@ async def translate_email_language_mcp(email_subject: str, email_body: str, agen
             logging.error(f"Error translating email details via MCP: {e}")
             raise
 
-##Get Order Details by order_id via MCP
+## Get Order Details by order_id via MCP
 async def get_order_details_mcp(order_id: str):
     """Get Order Details by order_id with MCP tool"""
     async with get_mcp_session() as session:
         tools = await load_mcp_tools(session)
-        #print(tools)
         
         # Get Order Details tool
-        translategetemaildetails_tool = next((tool for tool in tools if "getOrderDetailsByOrderId".lower() in tool.name.lower()), None)
-        if not translategetemaildetails_tool:
+        order_details_tool = next((tool for tool in tools if "getOrderDetailsByOrderId".lower() in tool.name.lower()), None)
+        if not order_details_tool:
             logging.error("getOrderDetailsByOrderId tool not found in MCP server")
             raise Exception("getOrderDetailsByOrderId tool not available")
         
         logging.info(f"Invoking getOrderDetailsByOrderId MCP tool...")
         try:
-            result = await translategetemaildetails_tool.ainvoke({
+            result = await order_details_tool.ainvoke({
                 "in_OrderNumber": order_id
             })
             logging.info(f"Fetched order details via MCP tool.")        
@@ -161,47 +134,47 @@ async def get_order_details_mcp(order_id: str):
             logging.error(f"Error Fetching order details via MCP: {e}")
             raise
 
-##Get Email Categorization via MCP
+## Get Email Categorization done via MCP
 async def categorize_email_mcp(content_to_categorize: str):
     """Categorize email body and subject with MCP tool"""
     async with get_mcp_session() as session:
         tools = await load_mcp_tools(session)
         
-        # Get Order Details tool
-        translategetemaildetails_tool = next((tool for tool in tools if "categorizeEmail".lower() in tool.name.lower()), None)
-        if not translategetemaildetails_tool:
+        # Get email categorized using Categorize Email tool
+        categorize_email_tool = next((tool for tool in tools if "categorizeEmail".lower() in tool.name.lower()), None)
+        if not categorize_email_tool:
             logging.error("categorizeEmail tool not found in MCP server")
             raise Exception("Categorize Email tool not available")
         
         logging.info(f"Invoking Categorize Email tool...")
         try:
-            result = await translategetemaildetails_tool.ainvoke({
+            result = await categorize_email_tool.ainvoke({
                 "in_Content_To_Categorize": content_to_categorize
             })
             logging.info(f"Categorized email via MCP tool.")        
             # Assuming 'result' is your string variable
-            order_details_dict = ast.literal_eval(result) if result else None  
-            return order_details_dict if order_details_dict else None   
+            email_category_dict = ast.literal_eval(result) if result else None  
+            return email_category_dict if email_category_dict else None   
             
         except Exception as e:
             logging.error(f"Error Categorizing email via MCP: {e}")
             raise
 
-##Email Sentiment Analysis via MCP
+## Email Sentiment Analysis via MCP
 async def analyze_email_sentiment_mcp(content_to_sentiment_analysis: str):
     """Email Sentiment Analysis email body and subject with MCP tool"""
     async with get_mcp_session() as session:
         tools = await load_mcp_tools(session)
         
         # Email Sentiment Analysis tool
-        emailsentimentanalysis_tool = next((tool for tool in tools if "emailSentimentAnalysis".lower() in tool.name.lower()), None)
-        if not emailsentimentanalysis_tool:
+        email_sentiment_analysis_tool = next((tool for tool in tools if "emailSentimentAnalysis".lower() in tool.name.lower()), None)
+        if not email_sentiment_analysis_tool:
             logging.error("emailSentimentAnalysis tool not found in MCP server")
             raise Exception("Email Sentiment Analysis tool not available")
         
         logging.info(f"Invoking emailSentimentAnalysis tool...")
         try:
-            result = await emailsentimentanalysis_tool.ainvoke({
+            result = await email_sentiment_analysis_tool.ainvoke({
                 "in_Content_To_Analysis": content_to_sentiment_analysis
             })
             logging.info(f"Email Sentiment Analysis via MCP tool.")        
@@ -216,18 +189,6 @@ async def analyze_email_sentiment_mcp(content_to_sentiment_analysis: str):
 # ---------------- Graph Nodes ----------------
 class GraphOutput(BaseModel):
     report: str
-# ---------------- Nodes ----------------
-# Get email details via MCP integration
-async def get_email_details_node(state: GraphState) -> GraphOutput:
-    """Get email details via MCP integration"""
-    email_details = await get_email_details_mcp(
-        state.message_id
-    )
-    
-    return state.model_copy(update={
-        "email_subject": email_details['email_subject'] or None,
-        "email_body": email_details['email_body'] or None
-    })
 
 # ---------------- Nodes ----------------
 # Translate email body and subject language if required via MCP integration
@@ -297,7 +258,7 @@ async def extract_order_id_node(state: GraphState) -> GraphState:
 
     output = await llm.ainvoke(
         [SystemMessage(system_prompt),
-         HumanMessage(state.email_body + "\n" + state.email_subject)]
+         HumanMessage("Extract the order ID from this message: " + state.email_body + "\n" + state.email_subject)]
     )
     try:
         payload = json.loads(output.content)
@@ -314,6 +275,7 @@ async def extract_order_id_node(state: GraphState) -> GraphState:
         extracted_order_id = None
         if isinstance(payload, dict):
             extracted_order_id = payload.get("order_id")
+
     logging.info(f"Extracted Order ID: {extracted_order_id}")
     return state.model_copy(update={
         "order_id": extracted_order_id or None
@@ -332,7 +294,7 @@ async def get_order_details_node(state: GraphState) -> GraphOutput:
     })
 
 def end_node(state: GraphState) -> GraphState:
-    """Final node to log the completion"""
+    """Final node to log the agent run completion"""
     logging.info(f"Email processing completed. Status: {state.final_status}")
     return state
 
@@ -369,13 +331,13 @@ async def reply_email_mcp(message_id: str, llmprompt_to_prepare_reply: str, repl
         tools = await load_mcp_tools(session)
         
         # Find the email tool
-        email_tool = next((tool for tool in tools if "replyToEmail".lower() in tool.name.lower()), None)
-        if not email_tool:
+        reply_to_email_tool = next((tool for tool in tools if "replyToEmail".lower() in tool.name.lower()), None)
+        if not reply_to_email_tool:
             logging.error("Email reply tool not found in MCP server.")
             raise Exception("Email reply tool not available.")
         
         try:
-            await email_tool.ainvoke({
+            await reply_to_email_tool.ainvoke({
                 "in_Message_Id": message_id,
                 "in_llmprompt_to_prepare_reply": llmprompt_to_prepare_reply,
                 "in_Reply_Language": reply_language
@@ -530,7 +492,7 @@ async def human_review_node(state: GraphState) -> Command:
     action_data = interrupt(
         CreateAction(
             app_name="HITL_Review",
-            title="Negative sentiment email response review",
+            title="Very Negative sentiment email response review",
             data={
                 "EmailSubject": state.translated_email_subject,
                 "EmailBody": state.translated_email_body,
