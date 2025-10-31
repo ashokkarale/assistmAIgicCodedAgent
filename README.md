@@ -1,6 +1,6 @@
 ### ✨ **AssistmAIgic** – Intelligent Email Agent for Order & Product Support
 
-**AssistmAIgic** is a specialized automation agent designed to streamline customer email handling for product orders and inquiries. Built on LangGraph’s state machine architecture and integrated with UiPath’s Model Context Portal (MCP), it delivers fast, accurate, and context-aware responses—while ensuring human oversight for sensitive cases.
+**AssistmAIgic** is a specialized automation agent designed to streamline customer email handling for product orders and inquiries. Built on LangGraph’s state machine architecture and integrated with UiPath’s Model Context Portal (MCP), it delivers fast, accurate, and context-aware responses while ensuring human oversight for sensitive cases.
 
 ---
 
@@ -8,8 +8,8 @@
 
 1. **Multilingual Email Handling**
    - Accepts customer emails in any language.
-   - Automatically translates incoming emails to a processing language (e.g., English).
-   - Replies are generated and translated back into the customer's original language for seamless communication.
+   - Automatically translates incoming emails to a processing language (e.g., English, Marathi, Hindi).
+   - Replies are generated and translated back into the customer's original language for seamless and personalize communication.
 
 2. **Order ID Extraction & Validation**
    - Parses email content to extract an 8-digit order ID.
@@ -21,6 +21,7 @@
      - *Product Inquiry*
      - *Order Status*
      - *Complaint*
+     - *etc.*
    - Assesses sentiment as *Positive*, *Negative*, or *Very Negative*.
 
 4. **Contextual Response Generation**
@@ -28,10 +29,10 @@
    - Crafts informative, personalized replies based on the customer's query and order context.
 
 5. **Human-in-the-Loop (HITL) Escalation**
-   - If sentiment is *Very Negative*, the agent routes the draft response to a human reviewer for approval or refinement—ensuring empathy and precision in sensitive situations.
+   - If sentiment is *Very Negative*, the agent routes the draft response to a human reviewer for approval or refinement ensuring empathy and precision in sensitive situations.
 
 6. **Automated Response Delivery**
-   - Sends the final response (automated or HITL-approved) to the customer in their original language.
+   - Sends the final email response (automated or HITL-approved) to the customer in their original language.
 
 7. **Interaction Logging**
    - Logs the outcome of each email interaction for traceability and analytics.
