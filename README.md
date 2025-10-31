@@ -142,7 +142,7 @@ uv run uipath run agent -f .\input.json
 - Create a storage bucket for Order Database. eg. AssistemAIgic DB. Sample CSV db provided in the project folder **AssistmAIgic DB**
 - Create a storage bucket for storing product, services, support, warrenty and every document required for providing good customer support. e.g. **AssistmAIgic Context**. Sample documents provided in the project.
 
-### 1.3 Indexes
+### 1.4 Indexes
 - Create a RAG Context Grounding Index which will be used by the agent to generate accurate response. e.g. AssistmAIgic_Index. Remember if you choose another name than this example, you will have to update it into `main.py` in the below logic.
 
 ```python
