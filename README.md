@@ -1,6 +1,6 @@
 ### ✨ **AssistmAIgic** – Intelligent Email Agent for Order & Product Support
 
-**AssistmAIgic** is a specialized automation agent designed to streamline customer email handling for product orders and inquiries. Built on LangGraph’s state machine architecture and integrated with UiPath’s Master Communication Portal (MCP), it delivers fast, accurate, and context-aware responses—while ensuring human oversight for sensitive cases.
+**AssistmAIgic** is a specialized automation agent designed to streamline customer email handling for product orders and inquiries. Built on LangGraph’s state machine architecture and integrated with UiPath’s Model Context Portal (MCP), it delivers fast, accurate, and context-aware responses—while ensuring human oversight for sensitive cases.
 
 ---
 
